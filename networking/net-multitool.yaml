@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: net-multitool
+  # namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: net-multitool
+  template:
+    metadata:
+      labels:
+        app: net-multitool
+    spec:
+      containers:
+        - name: net-multitool
+          image: jonlabelle/network-tools
+          resources: {}
+          command:
+            - sleep
+            - infinity

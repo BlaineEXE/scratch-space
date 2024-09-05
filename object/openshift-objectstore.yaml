@@ -1,0 +1,158 @@
+# ODF object store and child/related resources from 4.16
+---
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStore
+metadata:
+  name: storagecluster-cephobjectstore
+  namespace: rook-ceph # openshift-storage
+spec:
+  dataPool:
+    application: ""
+    erasureCoded:
+      codingChunks: 0
+      dataChunks: 0
+    failureDomain: host
+    mirroring: {}
+    quotas: {}
+    replicated:
+      replicasPerFailureDomain: 1
+      size: 3
+      targetSizeRatio: 0.49
+    statusCheck:
+      mirror: {}
+  gateway:
+    instances: 1
+    labels:
+      odf-resource-profile: ""
+    # placement:
+    #   nodeAffinity:
+    #     requiredDuringSchedulingIgnoredDuringExecution:
+    #       nodeSelectorTerms:
+    #       - matchExpressions:
+    #         - key: cluster.ocs.openshift.io/openshift-storage
+    #           operator: Exists
+    port: 80
+    priorityClassName: openshift-user-critical
+    resources:
+      requests:
+        cpu: 125m
+        memory: 128Mi
+    securePort: 443
+    # sslCertificateRef: storagecluster-cos-ceph-rgw-tls-cert
+    service:
+      annotations:
+        service.beta.openshift.io/serving-cert-secret-name: storagecluster-cos-ceph-rgw-tls-cert
+  healthCheck: {}
+  metadataPool:
+    application: ""
+    erasureCoded:
+      codingChunks: 0
+      dataChunks: 0
+    failureDomain: host
+    mirroring: {}
+    quotas: {}
+    replicated:
+      replicasPerFailureDomain: 1
+      size: 3
+    statusCheck:
+      mirror: {}
+  sharedPools:
+    dataPoolName: ""
+    metadataPoolName: ""
+    preserveRadosNamespaceDataOnDelete: false
+  zone:
+    name: ""
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: storagecluster-cephobjectstore
+  namespace: rook-ceph # openshift-storage
+spec:
+  # host: storagecluster-cephobjectstore-openshift-storage.apps.ci-ln-8t3w4h2-c1627.vmc-ci.devcluster.openshift.com
+  port:
+    targetPort: http
+  tls:
+    insecureEdgeTerminationPolicy: Allow
+    termination: edge
+  to:
+    kind: Service
+    name: rook-ceph-rgw-storagecluster-cephobjectstore
+    weight: 100
+  wildcardPolicy: None
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: storagecluster-cephobjectstore-secure
+  namespace: rook-ceph # openshift-storage
+spec:
+  # host: storagecluster-cephobjectstore-secure-openshift-storage.apps.ci-ln-8t3w4h2-c1627.vmc-ci.devcluster.openshift.com
+  port:
+    targetPort: https
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: reencrypt
+  to:
+    kind: Service
+    name: rook-ceph-rgw-storagecluster-cephobjectstore
+    weight: 100
+  wildcardPolicy: None
+---
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStoreUser
+metadata:
+  name: storagecluster-cephobjectstoreuser
+  namespace: rook-ceph # openshift-storage
+spec:
+  displayName: storagecluster
+  store: storagecluster-cephobjectstore
+---
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStoreUser
+metadata:
+  name: prometheus-user
+  namespace: rook-ceph # openshift-storage
+spec:
+  capabilities:
+    user: read
+  displayName: prometheus-user
+  store: storagecluster-cephobjectstore
+---
+# OBC storageclass
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    description: Provides Object Bucket Claims (OBCs)
+  name: rgw-s3
+parameters:
+  objectStoreName: storagecluster-cephobjectstore
+  objectStoreNamespace: rook-ceph # openshift-storage
+  region: us-east-1
+provisioner: rook-ceph.ceph.rook.io/bucket # openshift-storage.ceph.rook.io/bucket
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ceph-s3
+  namespace: rook-ceph
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: ceph-s3-tls-cert
+spec:
+  # ExternalName services create CNAME record pointing to externalName
+  # type: ExternalName
+  # externalName: rook-ceph-rgw-storagecluster-cephobjectstore.rook-ceph.svc.cluster.local
+  # headless services (clusterIP: None) get wildcard service serving certs
+  clusterIP: None
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443

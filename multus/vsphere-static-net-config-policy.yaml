@@ -1,0 +1,101 @@
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: ceph-public-net-shim-compute-0
+  namespace: openshift-storage
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+    kubernetes.io/hostname: compute-0
+  desiredState:
+    interfaces:
+      - name: odf-pub-shim
+        description: Shim interface used to connect host to OpenShift Data Foundation public Multus network
+        type: mac-vlan
+        state: up
+        mac-vlan:
+          base-iface: br-ex # YOUR IFACE HERE
+          mode: bridge
+          promiscuous: true
+        ipv4:
+          enabled: true
+          dhcp: false
+          address:
+            - ip: 192.168.29.1 # Node static IP
+              prefix-length: 24
+    routes:
+      config:
+        - destination: 192.168.20.0/24 # multus public network attachment definition CIDR
+          next-hop-interface: odf-pub-shim
+          # I think the below fields should get reasonable defaults
+          # metric: 150
+          # next-hop-address: ???
+          # table-id: 254
+---
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: ceph-public-net-shim-compute-1
+  namespace: openshift-storage
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+    kubernetes.io/hostname: compute-1
+  desiredState:
+    interfaces:
+      - name: odf-pub-shim
+        description: Shim interface used to connect host to OpenShift Data Foundation public Multus network
+        type: mac-vlan
+        state: up
+        mac-vlan:
+          base-iface: br-ex # YOUR IFACE HERE
+          mode: bridge
+          promiscuous: true
+        ipv4:
+          enabled: true
+          dhcp: false
+          address:
+            - ip: 192.168.29.2 # Node static IP
+              prefix-length: 24
+    routes:
+      config:
+        - destination: 192.168.20.0/24 # multus public network attachment definition CIDR
+          next-hop-interface: odf-pub-shim
+          # I think the below fields should get reasonable defaults
+          # metric: 150
+          # next-hop-address: ???
+          # table-id: 254
+---
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: ceph-public-net-shim-compute-2
+  namespace: openshift-storage
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+    kubernetes.io/hostname: compute-2
+  desiredState:
+    interfaces:
+      - name: odf-pub-shim
+        description: Shim interface used to connect host to OpenShift Data Foundation public Multus network
+        type: mac-vlan
+        state: up
+        mac-vlan:
+          base-iface: br-ex # YOUR IFACE HERE
+          mode: bridge
+          promiscuous: true
+        ipv4:
+          enabled: true
+          dhcp: false
+          address:
+            - ip: 192.168.29.3 # Node static IP
+              prefix-length: 24
+    routes:
+      config:
+        - destination: 192.168.20.0/24 # multus public network attachment definition CIDR
+          next-hop-interface: odf-pub-shim
+          # I think the below fields should get reasonable defaults
+          # metric: 150
+          # next-hop-address: ???
+          # table-id: 254

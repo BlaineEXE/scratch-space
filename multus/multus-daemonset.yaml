@@ -1,0 +1,30 @@
+# simple daemonset that connects to a multus network for testing
+# this approximates a Ceph daemon pod like mon/osd
+
+# use github.com/rook/rook - tests/scripts/multus/default-public-cluster-nads.yaml on minikube
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: multus-test
+  namespace: rook-ceph # openshift-storage # rook-ceph
+  labels:
+    app: multus-test
+spec:
+  selector:
+    matchLabels:
+      app: multus-test
+  template:
+    metadata:
+      labels:
+        app: multus-test
+      annotations:
+        k8s.v1.cni.cncf.io/networks: rook-ceph/public-net # openshift-storage/public-net #
+    spec:
+      containers:
+        - name: test
+          image: quay.io/ceph/ceph:v18
+          command:
+            - sleep
+            - infinity
+          resources: {}

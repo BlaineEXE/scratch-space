@@ -1,0 +1,39 @@
+# daemonset that runs on all hosts and connects to host net
+# this approximates a Rook/Ceph CSI driver daemonset
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: host-net-test
+  # namespace: rook-ceph
+  labels:
+    app: host-net-test
+spec:
+  selector:
+    matchLabels:
+      app: host-net-test
+  template:
+    metadata:
+      labels:
+        app: host-net-test
+    spec:
+      tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+      # securityContext:
+      #   runAsNonRoot: true
+      #   seccompProfile:
+      #     type: RuntimeDefault
+      hostNetwork: true
+      containers:
+        - name: test
+          image: quay.io/ceph/ceph:v18
+          command:
+            - sleep
+            - infinity
+          resources: {}
+          # securityContext:
+          #   allowPrivilegeEscalation: false
+          #   capabilities:
+          #     drop:
+          #       - "ALL"

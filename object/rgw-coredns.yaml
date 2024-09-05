@@ -1,0 +1,198 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: odf-dns
+  namespace: rook-ceph # openshift-storage
+data:
+  Corefile: |
+    .:5353 {
+        errors
+        health {
+            lameduck 20s
+        }
+        log . {
+             class all
+        }
+        ready
+        rewrite continue {
+          name suffix .ceph-s3.rook-ceph.svc .ceph-s3.data.local
+          answer auto
+        }
+        rewrite continue {
+          name suffix ceph-s3.rook-ceph.svc ceph-s3.data.local
+          answer auto
+        }
+        rewrite continue {
+          name suffix .ceph-s3.rook-ceph.svc.cluster.local .ceph-s3.data.local
+          answer auto
+        }
+        rewrite continue {
+          name suffix ceph-s3.rook-ceph.svc.cluster.local ceph-s3.data.local
+          answer auto
+        }
+        file /etc/coredns/odf data.local in-addr.arpa ip6.arpa {
+            reload 30s
+        }
+        prometheus 127.0.0.1:9153
+        forward . /etc/resolv.conf {
+            policy sequential
+        }
+        cache 900
+        reload
+    }
+  odf: |
+    @ 3600 IN SOA ns.data.local. admin.data.local. (
+      2021041600 ; Serial
+      3600       ; Refresh
+      600        ; Retry
+      604800     ; Expire
+      600 )      ; Negative Cache TTL
+
+    ceph-s3    60 IN CNAME rook-ceph-rgw-storagecluster-cephobjectstore.rook-ceph.svc.cluster.local.
+    *.ceph-s3  60 IN CNAME rook-ceph-rgw-storagecluster-cephobjectstore.rook-ceph.svc.cluster.local.
+
+
+# oc patch dns.operator/default --type=merge --patch '{"spec":{"servers":[{"forwardPlugin":{"upstreams":["'$(oc get -n rook-ceph svc odf-dns -ojsonpath={..clusterIP})':53"]},"name":"rook-dns","zones":["data.local", "ceph-s3.rook-ceph.svc", "ceph-s3.rook-ceph.svc.cluster.local"]}]}}'
+
+
+# data:
+#   Corefile: |
+#     .:5353 {
+#         errors
+#         health {
+#             lameduck 20s
+#         }
+#         log . {
+#              class all
+#         }
+#         ready
+#         file /etc/coredns/odf rook-ceph-rgw-storagecluster-cephobjectstore.rook-ceph.svc in-addr.arpa ip6.arpa {
+#             reload 30s
+#         }
+#         prometheus 127.0.0.1:9153
+#         forward . /etc/resolv.conf {
+#             policy sequential
+#         }
+#         cache 900
+#         reload
+#     }
+#   odf: |
+#     @ 3600 IN SOA ns.rook-ceph-rgw-storagecluster-cephobjectstore.rook-ceph.svc. admin.rook-ceph-rgw-storagecluster-cephobjectstore.rook-ceph.svc. (
+#       2021041600 ; Serial
+#       3600       ; Refresh
+#       600        ; Retry
+#       604800     ; Expire
+#       600 )      ; Negative Cache TTL
+
+#     *. 60 IN CNAME rook-ceph-rgw-storagecluster-cephobjectstore.rook-ceph.svc.cluster.local.
+
+
+
+#    ceph-s3   60 IN CNAME rook-ceph-rgw-ocs-storagecluster-cephobjectstore.rook-ceph.svc.cluster.local.
+#    *.ceph-s3 60 IN CNAME rook-ceph-rgw-ocs-storagecluster-cephobjectstore.rook-ceph.svc.cluster.local.
+
+# TODO: how do we route without specifying a new domain 'data.local'?
+# https://redhat-internal.slack.com/archives/CDCP2LA9L/p1721938129294689
+
+# For Noobaa
+#    s3    60 IN CNAME s3.openshift-storage.svc.cluster.local.
+#    *.s3  60 IN CNAME s3.openshift-storage.svc.cluster.local.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odf-dns
+  namespace: rook-ceph # openshift-storage
+  labels:
+    app: odf-dns
+spec:
+  selector:
+    matchLabels:
+      app: odf-dns
+  template:
+    metadata:
+      namespace: openshift-storage
+      labels:
+        app: odf-dns
+    spec:
+      containers:
+        - args:
+            - -conf
+            - /etc/coredns/Corefile
+          command:
+            - coredns
+          image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:16f82af39788414dcd7f889b5ee7e07bdc9760ee3d0320c65dcfe14d1f6786ce
+          imagePullPolicy: IfNotPresent
+          name: odf-dns
+          ports:
+            - containerPort: 5353
+              name: dns
+              protocol: UDP
+            - containerPort: 5353
+              name: dns-tcp
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 70Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - mountPath: /etc/coredns
+              name: config-volume
+              readOnly: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      preemptionPolicy: PreemptLowerPriority
+      priority: 2000001000
+      priorityClassName: system-node-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      serviceAccount: rook-ceph-system
+      serviceAccountName: rook-ceph-system
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - configMap:
+            name: odf-dns
+          name: config-volume
+---
+# This is the DNS service, not S3 service
+kind: Service
+apiVersion: v1
+metadata:
+  name: odf-dns
+  namespace: rook-ceph # openshift-storage
+  labels:
+    app: odf-dns
+spec:
+  type: ClusterIP
+  selector:
+    app: odf-dns
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+    targetPort: dns
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+    targetPort: dns-tcp
+---
+# AFTER APPLY:
+# oc patch dns.operator/default --type=merge --patch '{"spec":{"servers":[{"forwardPlugin":{"upstreams":["'$(oc get -n rook-ceph svc odf-dns -ojsonpath={..clusterIP})':53"]},"name":"odf-dns","zones":["data.local"]}]}}'
+
+# Add advertiseEndpoint:
+#   https:// ceph-s3.data.local :443
+# Add dnsNames? Or does ocs-operator do this?
+#   { route endpoints } // TODO: how to get route endpoints
