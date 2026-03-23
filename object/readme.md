@@ -1,5 +1,7 @@
 # Notes
 
+oc --namespace openshift-storage patch storagecluster ocs-storagecluster --type=merge --patch '{"spec": {"managedResources": {"cephObjectStores": {"reconcileStrategy": "ignore"}}}}'
+
 openssl x509 -noout -text -in BASE64_DECODED_CERT
 
 openssl s_client -connect ceph-s3.rook-ceph.svc:443

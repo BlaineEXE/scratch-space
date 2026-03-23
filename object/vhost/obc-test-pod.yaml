@@ -1,26 +1,18 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: test
 ---
 apiVersion: objectbucket.io/v1alpha1
 kind: ObjectBucketClaim
 metadata:
   name: test-bucket
-  namespace: test
+  namespace: default
 spec:
   generateBucketName: test-bkt
-  storageClassName: rgw-s3 # CHANGEME
-  additionalConfig:
-    # # To set for quota for OBC
-    # maxObjects: "1000"
-    # maxSize: "2G"
+  storageClassName: ocs-storagecluster-ceph-rgw # change to match the desired OBC storageclass
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: obc-test-pod
-  namespace: test
+  namespace: default
   labels:
     app: obc-test-pod
 spec:
@@ -33,17 +25,41 @@ spec:
       labels:
         app: obc-test-pod
     spec:
-      dnsPolicy: ClusterFirstWithHostNet
-      # serviceAccountName: rook-ceph-default
-      #securityContext:
-      #  allowPrivilegeEscalation: false
       containers:
         - name: obc-test
-          image: d3fk/s3cmd
+          image: quay.io/fedora/python-311
           command:
-            - sleep
-            - infinity
-          imagePullPolicy: IfNotPresent
+            - sh
+            - -c
+            - |
+              set -x
+
+              # needed for s3cmd
+              pip install python-dateutil
+
+              # download s3cmd
+              VER="2.4.0"
+              curl -O -L https://github.com/s3tools/s3cmd/releases/download/v${VER}/s3cmd-${VER}.tar.gz
+              tar -xzf s3cmd-${VER}.tar.gz
+              mv s3cmd-${VER}/ s3cmd
+
+              # s3cmd config file using vhost-style address and OBC info
+              cat <<EOF > .s3cfg
+              access_key = ${AWS_ACCESS_KEY_ID}
+              secret_key = ${AWS_SECRET_ACCESS_KEY}
+              host_base = ${BUCKET_HOST}:${BUCKET_PORT}
+              host_bucket = %(bucket)s.${BUCKET_HOST}:${BUCKET_PORT}
+              ca_certs_file = /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+              EOF
+              cat .s3cfg
+
+              ./s3cmd/s3cmd ls
+
+              # if this fails and above 'ls' succeeds, S3 connection works but wildcarding does not
+              ./s3cmd/s3cmd ls s3://${BUCKET_NAME}
+
+              # sleep to allow 'oc rsh' testing
+              sleep infinity
           tty: true
           securityContext:
             allowPrivilegeEscalation: false
@@ -60,8 +76,6 @@ spec:
                 secretKeyRef:
                   name: test-bucket
                   key: AWS_SECRET_ACCESS_KEY
-            - name: AWS_CA_BUNDLE
-              value: /cabundle/service-ca.crt
             - name: BUCKET_HOST
               valueFrom:
                 configMapKeyRef:
@@ -77,28 +91,4 @@ spec:
                 configMapKeyRef:
                   name: test-bucket
                   key: BUCKET_PORT
-        - name: net-test
-          image: jonlabelle/network-tools
-          command:
-            - sleep
-            - infinity
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-      # tolerations:
-      #   - key: "node.kubernetes.io/unreachable"
-      #     operator: "Exists"
-      #     effect: "NoExecute"
-      #     tolerationSeconds: 5
-
-# Test dns (from net-test pod)
-#   dig @odf-dns.rook-ceph.svc *.ceph-s3.data.local
-
-# TO TEST:
-#   s5cmd --endpoint-url https://$BUCKET_HOST:443 ls s3://$BUCKET_NAME
-#   echo "Hello Rook" > /tmp/hello
-#   s5cmd --endpoint-url https://$BUCKET_HOST:443 cp /tmp/hello s3://$BUCKET_NAME
-#   rm /tmp/hello
-#   s5cmd --endpoint-url https://$BUCKET_HOST:443 cp s3://$BUCKET_NAME/hello /tmp/hello
-#   cat /tmp/hello
+          resources: {}

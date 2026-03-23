@@ -1,0 +1,93 @@
+---
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: test-bucket
+  namespace: default
+spec:
+  generateBucketName: test-bkt
+  storageClassName: rook-ceph-delete-bucket # change to match the desired OBC storageclass
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: obc-test-pod
+  namespace: default
+  labels:
+    app: obc-test-pod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: obc-test-pod
+  template:
+    metadata:
+      labels:
+        app: obc-test-pod
+    spec:
+      containers:
+        - name: obc-test
+          image: quay.io/fedora/python-311
+          command:
+            - sh
+            - -c
+            - |
+              set -x
+
+              # needed for s3cmd
+              pip install python-dateutil
+
+              # download s3cmd
+              VER="2.4.0"
+              curl -O -L https://github.com/s3tools/s3cmd/releases/download/v${VER}/s3cmd-${VER}.tar.gz
+              tar -xzf s3cmd-${VER}.tar.gz
+              mv s3cmd-${VER}/ s3cmd
+
+              # s3cmd config file using path-style address and OBC info
+              cat <<EOF > .s3cfg
+              access_key = ${AWS_ACCESS_KEY_ID}
+              secret_key = ${AWS_SECRET_ACCESS_KEY}
+              host_base = ${BUCKET_HOST}:${BUCKET_PORT}
+              host_bucket = ${BUCKET_HOST}:${BUCKET_PORT}
+              use_https = False
+              EOF
+              cat .s3cfg
+
+              ./s3cmd/s3cmd ls
+
+              ./s3cmd/s3cmd ls s3://${BUCKET_NAME}
+
+              # sleep to allow 'kubectl exec' testing
+              sleep infinity
+          tty: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: test-bucket
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: test-bucket
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: BUCKET_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: test-bucket
+                  key: BUCKET_HOST
+            - name: BUCKET_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: test-bucket
+                  key: BUCKET_NAME
+            - name: BUCKET_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: test-bucket
+                  key: BUCKET_PORT
+          resources: {}

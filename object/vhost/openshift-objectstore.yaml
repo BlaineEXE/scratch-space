@@ -156,3 +156,64 @@ spec:
     port: 443
     protocol: TCP
     targetPort: 443
+
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   annotations:
+#     service.alpha.openshift.io/serving-cert-signed-by: openshift-service-serving-signer@1730405350
+#     service.beta.openshift.io/serving-cert-secret-name: storagecluster-cos-ceph-rgw-tls-cert
+#     service.beta.openshift.io/serving-cert-signed-by: openshift-service-serving-signer@1730405350
+#   creationTimestamp: "2024-10-31T21:03:09Z"
+#   labels:
+#     app: rook-ceph-rgw
+#     app.kubernetes.io/component: cephobjectstores.ceph.rook.io
+#     app.kubernetes.io/created-by: rook-ceph-operator
+#     app.kubernetes.io/instance: ocs-storagecluster-cephobjectstore
+#     app.kubernetes.io/managed-by: rook-ceph-operator
+#     app.kubernetes.io/name: ceph-rgw
+#     app.kubernetes.io/part-of: ocs-storagecluster-cephobjectstore
+#     ceph_daemon_id: ocs-storagecluster-cephobjectstore
+#     ceph_daemon_type: rgw
+#     rgw: ocs-storagecluster-cephobjectstore
+#     rook.io/operator-namespace: openshift-storage
+#     rook_cluster: openshift-storage
+#     rook_object_store: ocs-storagecluster-cephobjectstore
+#   name: rook-ceph-rgw-ocs-storagecluster-cephobjectstore
+#   namespace: openshift-storage
+#   ownerReferences:
+#   - apiVersion: ceph.rook.io/v1
+#     blockOwnerDeletion: true
+#     controller: true
+#     kind: CephObjectStore
+#     name: ocs-storagecluster-cephobjectstore
+#     uid: edeeb69f-4a5a-45ca-bdfb-ed5864c10f38
+#   resourceVersion: "84462"
+#   uid: 261a2504-0f55-4fd9-ab77-5abf4cefa31e
+# spec:
+#   clusterIP: 172.30.46.86
+#   clusterIPs:
+#   - 172.30.46.86
+#   internalTrafficPolicy: Cluster
+#   ipFamilies:
+#   - IPv4
+#   ipFamilyPolicy: SingleStack
+#   ports:
+#   - name: http
+#     port: 80
+#     protocol: TCP
+#     targetPort: 8080
+#   - name: https
+#     port: 443
+#     protocol: TCP
+#     targetPort: 443
+#   selector:
+#     app: rook-ceph-rgw
+#     ceph_daemon_id: ocs-storagecluster-cephobjectstore
+#     rgw: ocs-storagecluster-cephobjectstore
+#     rook_cluster: openshift-storage
+#     rook_object_store: ocs-storagecluster-cephobjectstore
+#   sessionAffinity: None
+#   type: ClusterIP
+# status:
+#   loadBalancer: {}
